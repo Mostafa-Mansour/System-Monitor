@@ -4,6 +4,7 @@
 #include <vector>
 #include <iostream>
 #include <unistd.h>
+#include <thread>
 
 #include "linux_parser.h"
 
@@ -76,25 +77,33 @@ float LinuxParser::MemoryUtilization() {
   string line, title, usage;
   vector<string> memVec;
   float memTotal, memFree;
-  int idx;
+  int idx=0;
   std::ifstream stream(kProcDirectory + kMeminfoFilename);
     if (stream.is_open()) {
+      while(std::getline(stream,line)){
+        std::istringstream linestream(line);
+        linestream>>title>>usage;
+        if(title=="MemTotal:"){
+          memTotal=std::stof(usage);
+          ++idx;
+          }
+         
+        else if (title=="MemFree:")
+         
+        {
+           memFree=std::stof(usage);
+           ++idx;
+        }
 
-      for(idx=0;idx<2;idx++){
-      std::getline(stream, line);
-      std::istringstream linestream(line);
-      linestream >> title >>  usage;
-      memVec.push_back(usage);
-      }  
-      
-    }
-    memTotal=std::stof(memVec[0]);
-    memFree=std::stof(memVec[1]);
-    
+        if(idx==2)
+          break;
+          
+
+      } 
     float memUsage=memTotal-memFree;
-
- 
-    return memUsage/memTotal;
+    return memUsage/memTotal;   
+    }
+    return 0;
  }
 
 // TODO: Read and return the system uptime
@@ -141,22 +150,24 @@ float LinuxParser::processCpuUtilization(int pid) {
        utilValues.push_back(value);
        idx++;
      }
+    utime=std::stof(utilValues[13]);
+    stime=std::stof(utilValues[14]);
+    cutime=std::stof(utilValues[15]);
+    cstime=std::stof(utilValues[16]);
+    starttime=std::stof(utilValues[21]);
+    double hertz=sysconf(_SC_CLK_TCK);
+    int numCpus=std::thread::hardware_concurrency();
+    double uptime=numCpus*systemUpTime();
+
+    float total_time = utime + stime;
+    total_time = total_time + cutime + cstime;
+
+    float seconds = uptime - (starttime / hertz);
+    return   ((total_time / hertz) / seconds);
      
    }
-   utime=std::stof(utilValues[13]);
-   stime=std::stof(utilValues[14]);
-   cutime=std::stof(utilValues[15]);
-   cstime=std::stof(utilValues[16]);
-   starttime=std::stof(utilValues[21]);
-   double hertz=sysconf(_SC_CLK_TCK);
-   double uptime=systemUpTime();
-
-   float total_time = utime + stime;
-   total_time = total_time + cutime + cstime;
-
-   float seconds = uptime - (starttime / hertz);
-   return   ((total_time / hertz) / seconds);
-
+   
+  return 0;
 
  }
 
@@ -182,23 +193,25 @@ int LinuxParser::TotalProcesses() {
 
 // TODO: Read and return the number of running processes
 int LinuxParser::RunningProcesses() { 
+
   string line, title, value;
   
   std::ifstream stream(kProcDirectory + kStatFilename);
     if (stream.is_open()) {
 
-      for(int idx=0;idx<8;idx++){
-        std::getline(stream, line);
-        if(idx==7){
-          std::istringstream linestream(line);
-          linestream >> title >> value;
+      while(std::getline(stream,line)){
+        std::istringstream linestream(line);
+        linestream >> title >> value;
+        if (title=="procs_running"){
+          return std::stoi(value);
         }
-      }  
+          
+      }
       
     }
-    return std::stoi(value);
-    
-    }
+    return 0;
+}
+
  
 
 // TODO: Read and return the command associated with a process
@@ -207,7 +220,6 @@ string LinuxParser::Command(int pid) {
   
   string line;
   std::string path=kProcDirectory +std::to_string(pid)+kCmdlineFilename;
-  //std::cout<<"The path is"<<path<<std::endl;
   std::ifstream stream(path);
   string value="";
    if (stream.is_open()) {
@@ -217,8 +229,7 @@ string LinuxParser::Command(int pid) {
      return value;
   
    }
-
-   //std::cout<<value<<std::endl; 
+  return std::string(); 
    
 }
 
@@ -232,18 +243,17 @@ string LinuxParser::Ram(int pid) {
   std::ifstream stream(path);
   string key="", value;
    if (stream.is_open()) {
-    int idx=0;
-    while(idx<18){
-     std::getline(stream, line);
-     std::istringstream linestream(line);
-     linestream >> key >> value;
-     idx++;
+     while(std::getline(stream,line)){
+      std::istringstream linestream(line);
+      linestream >> key >> value;
+      if(key=="VmSize:")
+        return value;
 
      }
-      
-  }
+   }
+   return std::string();
 
-  return value;
+
 }
 
 // TODO: Read and return the user ID associated with a process
@@ -254,20 +264,17 @@ string LinuxParser::Uid(int pid) {
   std::string path=kProcDirectory +std::to_string(pid)+kStatusFilename;
   //std::cout<<"The path is"<<path<<std::endl;
   std::ifstream stream(path);
-  int idx=0;
-  
-   if (stream.is_open()) {
-     
-     while(idx<9){
-      std::getline(stream,line);
+  if (stream.is_open()) {
+    while(std::getline(stream,line)){
       std::istringstream linestream(line);
       linestream >> key >> value;
-      idx++;
- }
- 
- return value;
-   }
+      if(key=="Uid:")
+        return value;
+    }
+  }
+  return std::string();
 }
+ 
 
 // TODO: Read and return the user associated with a process
 // REMOVE: [[maybe_unused]] once you define the function
@@ -289,7 +296,7 @@ string LinuxParser::User(int pid) {
     }
     return user;
   }
-
+return std::string();
  }
 
 // TODO: Read and return the uptime of a process
@@ -309,9 +316,10 @@ long LinuxParser::UpTime(int pid) {
       idx++;
 
     }
+    return std::stol(value)/sysconf(_SC_CLK_TCK);
   }
   //std::cout<<"value:"<<value<<std::endl;
-  return std::stol(value)/sysconf(_SC_CLK_TCK);
-  //return 0;
+  
+  return 0;
 
  }

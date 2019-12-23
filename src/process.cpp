@@ -26,13 +26,16 @@ float Process::CpuUtilization() const {
 string Process::Command() { return LinuxParser::Command(_pid); }
 
 // TODO: Return this process's memory utilization
-string Process::Ram() { 
+string Process::Ram() const { 
     string memUsage=LinuxParser::Ram(_pid);
+    if(!memUsage.empty()){
     int memMb=0;
     std::setprecision(1);
     memMb=std::stoi(memUsage)/1024;
     return std::string(std::to_string(memMb)); 
-    //return string(); 
+    }
+    
+    return string(); 
     }
 
 // TODO: Return the user (name) that generated this process
