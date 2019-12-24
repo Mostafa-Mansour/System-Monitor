@@ -120,17 +120,43 @@ long LinuxParser::systemUpTime() {
   }
 
 // TODO: Read and return the number of jiffies for the system
-long LinuxParser::Jiffies() { return 0; }
+// long LinuxParser::Jiffies() { return systemUpTime() * sysconf(_SC_CLK_TCK); }
 
-// TODO: Read and return the number of active jiffies for a PID
-// REMOVE: [[maybe_unused]] once you define the function
-long LinuxParser::ActiveJiffies(int pid[[maybe_unused]]) { return 0; }
+// long LinuxParser::ActiveJiffies(int pid) {
+//   string line, token;
+//   vector<string> values;
+//   std::ifstream filestream(LinuxParser::kProcDirectory + to_string(pid) +
+//                            LinuxParser::kStatFilename);
+//   if (filestream.is_open()) {
+//     std::getline(filestream, line);
+//     std::istringstream linestream(line);
+//     while (linestream >> token) {
+//       values.push_back(token);
+//     }
+//   }
+//   long jiffies{0};
+//   if (values.size() > 21) {
+//     long user = stol(values[13]);
+//     long kernel = stol(values[14]);
+//     long children_user = stol(values[15]);
+//     long children_kernel = stol(values[16]);
+//     jiffies = user + kernel + children_user + children_kernel;
+//   }
+//   return jiffies;
+// }
 
-// TODO: Read and return the number of active jiffies for the system
-long LinuxParser::ActiveJiffies() { return 0; }
+// long LinuxParser::ActiveJiffies() {
+//   vector<string> time = CpuUtilization();
+//   return (stol(time[CPUStates::kUser_]) + stol(time[CPUStates::kNice_]) +
+//           stol(time[CPUStates::kSystem_]) + stol(time[CPUStates::kIRQ_]) +
+//           stol(time[CPUStates::kSoftIRQ_]) + stol(time[CPUStates::kSteal_]) +
+//           stol(time[CPUStates::kGuest_]) + stol(time[CPUStates::kGuestNice_]));
+// }
 
-// TODO: Read and return the number of idle jiffies for the system
-long LinuxParser::IdleJiffies() { return 0; }
+// long LinuxParser::IdleJiffies() {
+//   vector<string> time = CpuUtilization();
+//   return (stol(time[CPUStates::kIdle_]) + stol(time[CPUStates::kIOwait_]));
+// }
 
 // TODO: Read and return Process CPU utilization
 float LinuxParser::processCpuUtilization(int pid) {
@@ -176,18 +202,20 @@ int LinuxParser::TotalProcesses() {
   string line, title, value;
   
   std::ifstream stream(kProcDirectory + kStatFilename);
+    //stream.close();
     if (stream.is_open()) {
-
-      for(int idx=0;idx<7;idx++){
-        std::getline(stream, line);
-        if(idx==6){
-          std::istringstream linestream(line);
-          linestream >> title >> value;
+      while(std::getline(stream,line)){
+        std::istringstream linestream(line);
+        linestream >> title >> value;
+        if(title=="processes"){
+          stream.close();
+          return std::stoi(value);;
         }
-      }  
-      
+          
+      }
     }
-    return std::stoi(value);
+    
+    return 0;
     
     }
 
@@ -203,12 +231,14 @@ int LinuxParser::RunningProcesses() {
         std::istringstream linestream(line);
         linestream >> title >> value;
         if (title=="procs_running"){
+          stream.close();
           return std::stoi(value);
         }
           
       }
       
     }
+    
     return 0;
 }
 
@@ -226,6 +256,7 @@ string LinuxParser::Command(int pid) {
      std::getline(stream,line);
      std::istringstream linestream(line);
      linestream>>value;
+     stream.close();
      return value;
   
    }
